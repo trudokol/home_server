@@ -1,0 +1,17 @@
+services:
+  main:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "53334:53334"
+    container-name: home_server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - data:/app/data
+      - logs:/app/logs
+
+volumes:
+  data:
+  logs:

@@ -1,0 +1,20 @@
+name: CI/CD home_server
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+      - name: stop and remove containers, networks
+        run: docker-compose down
+      - name: docker-compose
+        run: docker-compose -f docker-compose.yml up -d --build
+      - name: remove unused data
+        run: docker container prune -f
