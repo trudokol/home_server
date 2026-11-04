@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class Settings():
     owner_id : int
-    whitelist : list
     telegram_token : str
     is_telegram_blocked : bool
     mqtt_broker : str | None
@@ -21,7 +20,6 @@ def load_settings() -> Settings:
 
     return Settings(
         owner_id = int(os.environ["OWNER_ID"]),
-        whitelist = os.environ["WHITELIST"],
         telegram_token = os.environ["TOKEN"],
         is_telegram_blocked = bool(os.environ["BLOCKED"]),
         mqtt_broker = os.environ.get("MQTT_BROKER") or None,
