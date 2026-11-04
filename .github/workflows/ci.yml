@@ -9,11 +9,19 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    environment: home_server_env
     steps:
       - name: checkout repo
         uses: actions/checkout@v3
       - name: stop and remove containers, networks
         run: docker-compose down
+        
+      - name: сreate .env file
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: |
+          echo "$ALL_SECRETS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
+
       - name: docker-compose
         run: docker-compose -f docker-compose.yml up -d --build
       - name: remove unused data
