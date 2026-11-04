@@ -6,7 +6,7 @@ import time
 
 from config import Settings
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("smart_home")
 
 PUBLISH_MESSAGE_RETRY = 3
 SUBSCRIBE_TIMEOUT = 15
@@ -15,13 +15,16 @@ MQTT_TOPIC_OUTGOING = "messages/to_telegram_bridge"
 
 class MqttClient:
     """
-    Осуществляет обмен сообщениями между серверами через MQTT
+    Инициализировать: client_mqtt = MqttClient(параметры)\n
+    Запустить: await start_service()\n
+    Остановить: await stop_service()\n
+    Осуществляет обмен сообщениями между серверами через MQTT\n
     Проверить очередь входящих сообщений на пустоту:
-    is_income_queue_empty() -> bool
+    is_income_queue_empty() -> bool\n
     Получить входящее сообщение:
-    get_incoming_message() -> str
+    get_incoming_message() -> str\n
     Отправить сообщение:
-    send_message(text)
+    send_message(text)\n
 
     на самом деле можно было отправлять сообщения через await publish_message(text),
     но я до этого не додумался + мне понравилась идея, чтобы это больше было похоже
@@ -83,6 +86,7 @@ class MqttClient:
 
             error_code = rc[0]
             if error_code == mqtt.MQTT_ERR_SUCCESS:
+                log.debug("MqttClient успешно отправил сообщение")
                 break
             else:
                 retry += 1
