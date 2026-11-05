@@ -29,6 +29,7 @@ async def heartbeat_endpoint(endpoint : str):
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(endpoint) as responce:
+                        log.debug(f"responce code: {responce.status}")
                         if responce.status != 200:
                             if consecutive_errors_count >= 3:
                                 consecutive_errors_count = 0
