@@ -3,8 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "53334:53334"
+    network_mode: "host"
+    # ports:
+    #   - "53334:53334"
     container_name: home_server
     extra_hosts:
       - "host.docker.internal:host-gateway"
