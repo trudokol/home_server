@@ -10,8 +10,8 @@ log = logging.getLogger("smart_home")
 
 PUBLISH_MESSAGE_RETRY = 3
 SUBSCRIBE_TIMEOUT = 15
-MQTT_TOPIC_INCOME = "skasdjhg/feeds/to-home-server"
-MQTT_TOPIC_OUTGOING = "skasdjhg/feeds/to-telegram-bridge"
+MQTT_TOPIC_INCOME = "feeds/to-home-server"
+MQTT_TOPIC_OUTGOING = "feeds/to-telegram-bridge"
 
 class MqttClient:
     """
