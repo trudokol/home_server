@@ -12,6 +12,9 @@ class Settings():
     mqtt_port : int | None
     mqtt_username : str | None
     mqtt_password : str | None
+    client_id : str | None
+    mqtt_topic_outgoing : str | None
+    mqtt_topic_income : str | None
     heartbeat_endpoint : str | None
     debug_mode : bool
 
@@ -26,6 +29,9 @@ def load_settings() -> Settings:
         mqtt_port = int(os.environ.get("MQTT_PORT")) or None,
         mqtt_username = os.environ.get("MQTT_USERNAME") or None,
         mqtt_password = os.environ.get("MQTT_PASSWORD") or None,
+        client_id = os.environ.get("CLIENT_ID") or None,
+        mqtt_topic_outgoing = os.environ.get("MQTT_TOPIC_OUTGOING") or None,
+        mqtt_topic_income = os.environ.get("MQTT_TOPIC_INCOME") or None,
         heartbeat_endpoint = os.environ.get("HEARTBEAT_ENDPOINT") or None,
         debug_mode = os.environ["DEBUG"]
     )

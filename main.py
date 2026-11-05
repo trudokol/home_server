@@ -103,7 +103,10 @@ async def main():
 
 
     mqtt_client = MqttClient(settings.mqtt_username, settings.mqtt_password,
-                             settings.mqtt_broker, settings.mqtt_port)
+                             settings.mqtt_broker, settings.mqtt_port,
+                             client_id=settings.client_id,
+                             mqtt_topic_income=settings.mqtt_topic_income,
+                             mqtt_topic_outgoing=settings.mqtt_topic_outgoing)
     await mqtt_client.start_service()
 
     resolver = Resolver(settings.owner_id)
