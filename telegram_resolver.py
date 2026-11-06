@@ -80,7 +80,7 @@ class Resolver:
         data = {}
         for key, value in self.resolved.items():
             data[key] = asdict(value)
-        data_json = json.dumps(data)
+        data_json = json.dumps(data, indent=2)
 
         with open("data/resolved", "w") as document:
             document.write(data_json)

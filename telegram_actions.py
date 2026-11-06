@@ -223,6 +223,9 @@ class TelegramActions:
 
             user.base_function = self.main_menu.__name__
             self.greet(user)
+            user.first_visit = False
+
+            self.resolver.update_user(user)
 
         func = self.functions.get(user.base_function)
         if func:
