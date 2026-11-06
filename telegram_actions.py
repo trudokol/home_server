@@ -202,6 +202,8 @@ class TelegramActions:
             text += "\nВам пока не дали ни одной кнопки"
         
         self.sendMessage(text=text, chat_id=user.chat_id, reply_makrup=builder.as_markup())
+        log.debug(f"Из main_menu отправлено сообщение: text = {text}; chat_id = {user.chat_id}; \
+                   reply_makrup = {str(deserialize_telegram_object_to_python(builder.as_markup()))}")
 
 
 
