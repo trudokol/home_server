@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import deque
 from enum import IntEnum
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from time import time
 from functools import wraps
 from inspect import cleandoc
@@ -30,6 +30,9 @@ class message_type(IntEnum):
     callback_query  = 11
     message         = 12
 
+class Operations(IntEnum):
+    take_to_function = 1
+
 
 class TelegramActions:
     """
@@ -51,15 +54,18 @@ class TelegramActions:
     Функции для отправки сообщения в телеграм:
     sendMessage(chat_id, text, reply_markup | None)
     """
+
     def __init__(self, resolver : Resolver):
+        self.functions = {
+            self.main_menu.__name__ : self.main_menu,
+            self.echo.__name__ : self.echo
+        }
+
+
         self.resolver = resolver
         self.income_message_queue = deque() # очередь входящих сообщений на обработку
         self.outgoing_message_queue = deque() # очередь исходящих сообщений на отправку
         self.background_tasks = []
-
-        self.ALL_FUNCTIONS = [self.main_menu, self.echo]
-        self.main_menu.__dict__["second_name"] = "Главное меню"
-        self.echo.__dict__["second_name"] = "Эхо"
 
 
     def process_message(self, message : Message | CallbackQuery):
@@ -144,7 +150,7 @@ class TelegramActions:
                 if type(args[0]) == User:
                     user = args[0]
                     if not user.ignore:
-                        if func in user.available_functions:
+                        if func.__name__ in user.available_functions:
                             return func(*args, **kwargs)
                         else:
                             log.debug(f"User {user.username} ({user.chat_id}) tried to enter in disallowed function.")
@@ -162,7 +168,7 @@ class TelegramActions:
     @access_check
     def echo(self, message : Message):
         builder = InlineKeyboardBuilder()
-        builder.button(text="Назад", callback_data="Take me to " + self.main_menu.__name__)
+        builder.button(text="Назад", callback_data=f"{Operations.take_to_function}|{self.main_menu.__name__}")
 
         self.sendMessage(message.from_user.id, message.text, reply_makrup=builder.as_markup())
 
@@ -179,9 +185,9 @@ class TelegramActions:
 
         builder = InlineKeyboardBuilder()
 
-        for func in user.available_functions:
-            builder.button(text=f"Перейти в {func.__dict__["second_name"]}",
-                           callback_data="Take me to " + func.__name__)
+        for func_name in user.available_functions:
+            builder.button(text=f"Перейти в {func_name}",
+                           callback_data=f"{Operations.take_to_function}|{func_name}")
 
         if len(user.available_functions) == 0:
             text += "\nВам пока не дали ни одной кнопки"
@@ -205,32 +211,35 @@ class TelegramActions:
 
     async def onMessage(self, message : Message):
         user = self.resolver.get_info(message.from_user.id)
+
         if user is None: # первое пришествие
             self.resolver.add_user_from_telegram_object(message)
             user = self.resolver.get_info(message.from_user.id) # добавлен пользователь без прав
 
             if user.rank == Ranks.owner:
-                user.available_functions += self.ALL_FUNCTIONS
+                user.available_functions = self.functions.keys()
             elif user.rank == Ranks.user:
-                user.available_functions.append(self.main_menu)
+                user.available_functions.append(self.main_menu.__name__)
 
-            user.base_function = self.main_menu
+            user.base_function = self.main_menu.__name__
             self.greet(user)
-        
-        user.base_function(user)
+
+        func = self.functions.get(user.base_function)
+        if func:
+            func(func)
             
 
 
     async def onCallbackQuery(self, callback : CallbackQuery):
         if callback.data:
             data = callback.data
-            if data[:len("Take me to ")] == "Take me to ":
-                take_to_name = data[len("Take me to "):]
-                for func in self.ALL_FUNCTIONS:
-                    if func.__name__ == take_to_name:
-                        user = self.resolver.get_info(callback.from_user.chat_id)
-                        func(user)
-                        break
+            splitted = data.split("|")
+            if splitted[0] == Operations.take_to_function:
+                take_to_name = splitted[1]
+                func = self.functions.get(take_to_name)
+                if func:
+                    user = self.resolver.get_info(callback.from_user.chat_id)
+                    func(user)
 
 
 

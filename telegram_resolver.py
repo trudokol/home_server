@@ -27,11 +27,11 @@ class User():
     chat_id : int
     username : str
     rank : int
-    available_functions : list[function]
+    available_functions : list[str]
     context : dict
     ignore : bool = False
     first_visit : bool = True
-    base_function : function | None = None
+    base_function : str | None = None
 
 
 
