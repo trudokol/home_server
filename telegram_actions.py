@@ -3,11 +3,16 @@ import logging
 from collections import deque
 from enum import IntEnum
 from dataclasses import dataclass
+from time import time
+from functools import wraps
+from inspect import cleandoc
+from aiogram.utils.markdown import html_decoration
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from telegram_resolver import Ranks, Functions, User, Resolver
 
@@ -51,6 +56,10 @@ class TelegramActions:
         self.income_message_queue = deque() # очередь входящих сообщений на обработку
         self.outgoing_message_queue = deque() # очередь исходящих сообщений на отправку
         self.background_tasks = []
+
+        self.ALL_FUNCTIONS = [self.main_menu, self.echo]
+        self.main_menu.second_name = "Главное меню"
+        self.echo.second_name = "Эхо"
 
 
     def process_message(self, message : Message | CallbackQuery):
@@ -120,29 +129,109 @@ class TelegramActions:
     # MODULATE_HERE
     # Ниже писать логику обработки сообщений
 
-    def access_check(chat_id : int | User, function_id : int):
+    def access_check(self, func):
         """
-        Эта функция предназначена для декорирования.
+        Эта функция предназначена только для декорирования.\n
+        <b>Первый аргумент всегда должен быть User'ом, которого мы проверяем.</b>\n
         Все пользователи, у которых есть доступ к функции
-        будут пропущены далее, для других сработает заглушка
+        будут пропущены дальше, для других же сработает заглушка.
+        Для игнорируемых пользователей сработает другая.
         """
 
-        def out_wrapper(func):
-            def inner_wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-            return inner_wrapper
-        return out_wrapper
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if len(args) > 0:
+                if type(args[0]) == User:
+                    user = args[0]
+                    if not user.ignore:
+                        if func in user.available_functions:
+                            return func(*args, **kwargs)
+                        else:
+                            log.debug(f"User {user.username} ({user.chat_id}) tried to enter in disallowed function.")
+                    else:
+                        log.debug(f"Message from {user.username} ({user.chat_id}) ignored.")
+                else:
+                    log.warning("Function access_check claims User as first argument")
+            else:
+                log.error("Function access_check claims at least one argument (User)")
+
+        return wrapper
 
 
+
+    @access_check
     def echo(self, message : Message):
-        self.sendMessage(message.from_user.id, message.text)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="Назад", callback_data="Take me to " + self.main_menu.__name__)
 
+        self.sendMessage(message.from_user.id, message.text, reply_makrup=builder.as_markup())
+
+    @access_check
+    def main_menu(self, user : User):
+        if user.rank == Ranks.owner:
+            text = cleandoc("""
+            Главном меню, Господин
+            """)
+        else:
+            text == cleandoc("""
+            Главном меню
+            """)
+
+        builder = InlineKeyboardBuilder()
+
+        for func in user.available_functions:
+            builder.button(text=f"Перейти в {func.second_name}",
+                           callback_data="Take me to " + func.__name__)
+
+        if len(user.available_functions) == 0:
+            text += "\nВам пока не дали ни одной кнопки"
+        
+        self.sendMessage(text=text, chat_id=user.chat_id, reply_makrup=builder.as_markup())
+
+
+
+    def greet(self, user : User):
+        if user.rank == Ranks.owner:
+            greeting_text = cleandoc("""
+            ПРИВЕТ СОЗДАТЕЛЬ!!!!11!!
+            обожаю тебя
+            """)
+        else:
+            greeting_text = html_decoration.quote(cleandoc("""
+            привет, <user>!
+            """).replace("<user>", user.username))
+        
+        self.sendMessage(chat_id=user.chat_id, text=greeting_text)
 
     async def onMessage(self, message : Message):
-        self.echo(message)
+        user = self.resolver.get_info(message.from_user.id)
+        if user is None: # первое пришествие
+            self.resolver.add_user_from_telegram_object(message)
+            user = self.resolver.get_info(message.from_user.id) # добавлен пользователь без прав
+
+            if user.rank == Ranks.owner:
+                user.available_functions += self.ALL_FUNCTIONS
+            elif user.rank == Ranks.user:
+                user.available_functions.append(self.main_menu)
+
+            user.base_function = self.main_menu
+            self.greet(user)
+        
+        user.base_function(user)
+            
+
 
     async def onCallbackQuery(self, callback : CallbackQuery):
-        pass
+        if callback.data:
+            data = callback.data
+            if data[:len("Take me to ")] == "Take me to ":
+                take_to_name = data[len("Take me to "):]
+                for func in self.ALL_FUNCTIONS:
+                    if func.__name__ == take_to_name:
+                        user = self.resolver.get_info(callback.from_user.chat_id)
+                        func(user)
+                        break
+
 
 
 

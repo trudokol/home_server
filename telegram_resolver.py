@@ -18,8 +18,8 @@ class Ranks(IntEnum):
     owner           = 1
     user            = 2
 
-class Functions(IntEnum):
-    database_lookup = 1
+# class Functions(IntEnum):
+#     database_lookup = 1
 
 @dataclass()
 class User():
@@ -27,8 +27,11 @@ class User():
     chat_id : int
     username : str
     rank : int
-    available_functions : list[int]
+    available_functions : list[function]
     context : dict
+    ignore : bool = False
+    first_visit : bool = True
+    base_function : function | None = None
 
 
 
@@ -110,15 +113,11 @@ class Resolver:
 
         if chat_id == self.owner_id:
             rank = Ranks.owner
-            available_functions = [i.value for i in Functions.__members__.values()]
-            # доступны все функции
         else:
             rank = Ranks.user
-            available_functions = []
-            # ничего не доступно
 
         user = User(fullname=fullname, chat_id=chat_id, username=username, rank=rank,
-                    available_functions=available_functions, context=context)
+                    available_functions=[], context=context)
 
         self.add_user(user)
 
