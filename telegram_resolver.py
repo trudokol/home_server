@@ -55,7 +55,8 @@ class Resolver:
         data = {}
         if os.path.exists("data/resolved"):
             with open("data/resolved", 'r') as document:
-                raw = json.loads(document.read())
+                raw = document.read()
+                raw = json.loads(raw) if raw else None
 
                 if type(raw) == dict:
                     for key, value in raw.items():
