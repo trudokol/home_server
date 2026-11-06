@@ -120,6 +120,19 @@ class TelegramActions:
     # MODULATE_HERE
     # Ниже писать логику обработки сообщений
 
+    def access_check(chat_id : int | User, function_id : int):
+        """
+        Эта функция предназначена для декорирования.
+        Все пользователи, у которых есть доступ к функции
+        будут пропущены далее, для других сработает заглушка
+        """
+
+        def out_wrapper(func):
+            def inner_wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return inner_wrapper
+        return out_wrapper
+
 
     def echo(self, message : Message):
         self.sendMessage(message.from_user.id, message.text)
