@@ -6,12 +6,13 @@ from dataclasses import dataclass, asdict
 from time import time
 from functools import wraps
 from inspect import cleandoc
-from aiogram.utils.markdown import html_decoration
 
+from aiogram.utils.markdown import html_decoration
+from aiogram.utils.serialization import deserialize_telegram_object_to_python
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from telegram_resolver import Ranks, User, Resolver
@@ -125,9 +126,16 @@ class TelegramActions:
 
 
 
-    def sendMessage(self, chat_id : int, text : str, reply_makrup = None):
-        data = {"chat_id" : chat_id, "text" : text, "reply_makrup" : reply_makrup}
+    def sendMessage(self, chat_id : int, text : str, reply_markup = None):
+        if reply_markup:
+            reply_markup_dict = deserialize_telegram_object_to_python(reply_markup)
+            reply_markup = reply_markup_dict
+
+
+        data = {"chat_id" : chat_id, "text" : text, "reply_markup" : reply_markup}
         message = {"message_type" : message_type.text, "data" : data}
+
+        
 
         self.outgoing_message_queue.append(message)
 
@@ -146,9 +154,10 @@ class TelegramActions:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if len(args) > 0:
-                if type(args[0]) == User:
-                    user = args[0]
+            log.debug(f"access_check wrapper got *args:{str(args)}")
+            if len(args) > 1:
+                if type(args[1]) == User:
+                    user = args[1]
                     if not user.ignore:
                         if func.__name__ in user.available_functions:
                             return func(*args, **kwargs)
@@ -157,7 +166,7 @@ class TelegramActions:
                     else:
                         log.debug(f"Message from {user.username} ({user.chat_id}) ignored.")
                 else:
-                    log.warning("Function access_check claims User as first argument")
+                    log.warning("Function access_check claims User as second argument (because first is self)")
             else:
                 log.error("Function access_check claims at least one argument (User)")
 
@@ -217,7 +226,7 @@ class TelegramActions:
             user = self.resolver.get_info(message.from_user.id) # добавлен пользователь без прав
 
             if user.rank == Ranks.owner:
-                user.available_functions = self.functions.keys()
+                [user.available_functions.append(i) for i in self.functions.keys()]
             elif user.rank == Ranks.user:
                 user.available_functions.append(self.main_menu.__name__)
 
@@ -227,9 +236,11 @@ class TelegramActions:
 
             self.resolver.update_user(user)
 
+        log.debug(f"user.available_functions ({user.username}) содержит: {str(user.available_functions)}")
+
         func = self.functions.get(user.base_function)
         if func:
-            func(func)
+            func(user)
             
 
 

@@ -5,6 +5,7 @@ import os
 from time import time
 import json
 from aiogram.types import Message, CallbackQuery
+from aiogram.utils.serialization import deserialize_telegram_object_to_python
 
 from config import load_settings
 from mqtt_bridge import MqttClient
