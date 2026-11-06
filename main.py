@@ -8,7 +8,7 @@ from aiogram.types import Message, CallbackQuery
 
 from config import load_settings
 from mqtt_bridge import MqttClient
-from telegram_resolver import Resolver, Ranks, Functions, User
+from telegram_resolver import Resolver, Ranks, User
 from telegram_actions import TelegramActions, message_type
 
 MINIMAL_FREQUENCY_OF_ERROR_WARNINGS = 60 * 10 # В секундах

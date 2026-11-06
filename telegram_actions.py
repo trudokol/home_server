@@ -14,7 +14,7 @@ from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from telegram_resolver import Ranks, Functions, User, Resolver
+from telegram_resolver import Ranks, User, Resolver
 
 log = logging.getLogger("smart_home")
 
@@ -58,8 +58,8 @@ class TelegramActions:
         self.background_tasks = []
 
         self.ALL_FUNCTIONS = [self.main_menu, self.echo]
-        self.main_menu.second_name = "Главное меню"
-        self.echo.second_name = "Эхо"
+        self.main_menu.__dict__["second_name"] = "Главное меню"
+        self.echo.__dict__["second_name"] = "Эхо"
 
 
     def process_message(self, message : Message | CallbackQuery):
@@ -129,7 +129,7 @@ class TelegramActions:
     # MODULATE_HERE
     # Ниже писать логику обработки сообщений
 
-    def access_check(self, func):
+    def access_check(func):
         """
         Эта функция предназначена только для декорирования.\n
         <b>Первый аргумент всегда должен быть User'ом, которого мы проверяем.</b>\n
@@ -180,7 +180,7 @@ class TelegramActions:
         builder = InlineKeyboardBuilder()
 
         for func in user.available_functions:
-            builder.button(text=f"Перейти в {func.second_name}",
+            builder.button(text=f"Перейти в {func.__dict__["second_name"]}",
                            callback_data="Take me to " + func.__name__)
 
         if len(user.available_functions) == 0:
