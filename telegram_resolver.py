@@ -11,27 +11,9 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery
 
+from models import User, Ranks
+
 log = logging.getLogger("smart_home")
-
-
-class Ranks(IntEnum):
-    owner           = 1
-    user            = 2
-
-# class Functions(IntEnum):
-#     database_lookup = 1
-
-@dataclass()
-class User():
-    fullname : str
-    chat_id : int
-    username : str
-    rank : int
-    available_functions : list[str]
-    context : dict
-    ignore : bool = False
-    first_visit : bool = True
-    base_function : str | None = None
 
 
 

@@ -6,18 +6,21 @@ from time import time
 import json
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.serialization import deserialize_telegram_object_to_python
+import signal
+from functools import partial
 
+from models import *
 from config import load_settings
 from mqtt_bridge import MqttClient
-from telegram_resolver import Resolver, Ranks, User
-from telegram_actions import TelegramActions, message_type
+from telegram_resolver import Resolver
+from telegram_bot_logic import TelegramBotLogic
 
 MINIMAL_FREQUENCY_OF_ERROR_WARNINGS = 60 * 10 # В секундах
 HEARTBEAT_FREQUENCY = 60 * 5
 
 log = None
 resolver = None
-tg_actions = None
+tg_bot_logic = None
 mqtt_client = None
 
 
@@ -66,19 +69,19 @@ async def transfer():
 
                 if ms_type == message_type.message:
                     message = Message.model_validate(message_dict["data"])
-                    tg_actions.process_message(message)
+                    tg_bot_logic.process_message(message)
                     log.info("Сообщение передано в TelegramActions")
 
                 elif ms_type == message_type.callback_query:
                     message = CallbackQuery.model_validate(message_dict["data"])
-                    tg_actions.process_message(message)
+                    tg_bot_logic.process_message(message)
                     log.info("Сообщение передано в TelegramActions")
                     
                 else:
                     log.warning("Сообщение не поддерживается")
 
-            if not tg_actions.is_outgoing_message_queue_empty():
-                message = tg_actions.get_outgoing_message()
+            if not tg_bot_logic.is_outgoing_message_queue_empty():
+                message = tg_bot_logic.get_outgoing_message()
                 message_json = json.dumps(message)
 
                 mqtt_client.send_message(message_json)
@@ -88,11 +91,29 @@ async def transfer():
         pass
 
 
+async def ask_exit(loop, background_tasks, signal):
+    log.info("Получен сигнал об остановке (%s), завершаю работу..." % signal)
+    
+    for task in background_tasks:
+        task.cancel()
+
+    await asyncio.gather(*background_tasks)
+
+    if tg_bot_logic:
+        await tg_bot_logic.stop_service()
+    if mqtt_client:
+        await mqtt_client.stop_service()
+
+    loop.stop()
+    
+
 async def main():
     global log
     global resolver
     global mqtt_client
-    global tg_actions
+    global tg_bot_logic
+
+    background_tasks = []
 
     settings = load_settings()
 
@@ -112,13 +133,34 @@ async def main():
     await mqtt_client.start_service()
 
     resolver = Resolver(settings.owner_id)
-    tg_actions = TelegramActions(resolver)
-    await tg_actions.start_service()
+    tg_bot_logic = TelegramBotLogic(resolver)
+    await tg_bot_logic.start_service()
 
-    asyncio.create_task(transfer())
+    background_tasks.append(
+        asyncio.create_task(transfer())
+    )
 
+    background_tasks.append(
+        asyncio.create_task(heartbeat_endpoint(settings.heartbeat_endpoint))
+    )
     log.info(f"Heartbeat запущен для endpoint: {settings.heartbeat_endpoint}")
-    await heartbeat_endpoint(settings.heartbeat_endpoint)
+
+
+    loop = asyncio.get_running_loop()
+    for sig in ["SIGINT", "SIGTERM"]:
+        try:
+            loop.add_signal_handler(
+                getattr(signal, sig),
+                partial(ask_exit, loop, background_tasks, sig)
+            )
+        except NotImplementedError:
+            log.debug("Got NotImplementedError on signal %s" % sig)
+
+    try:
+        while True:
+            await asyncio.sleep(0.5)
+    except Exception as error:
+        log.debug(f"Got exception in main loop: {str(error)}")
     
 
 
