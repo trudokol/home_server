@@ -33,7 +33,37 @@ class message_type(IntEnum):
 
 class Operations(IntEnum):
     take_to_function = 1
+    change_base_function = 2
 
+
+def access_check(func):
+    """
+    Эта функция предназначена только для декорирования.\n
+    <b>Первый аргумент всегда должен быть User'ом, которого мы проверяем.</b>\n
+    Все пользователи, у которых есть доступ к функции
+    будут пропущены дальше, для других же сработает заглушка.
+    Для игнорируемых пользователей сработает другая.
+    """
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        log.debug(f"access_check wrapper got *args:{str(args)}")
+        if len(args) > 1:
+            if type(args[1]) == User:
+                user = args[1]
+                if not user.ignore:
+                    if func.__name__ in user.available_functions:
+                        return func(*args, **kwargs)
+                    else:
+                        log.debug(f"User {user.username} ({user.chat_id}) tried to enter in disallowed function.")
+                else:
+                    log.debug(f"Message from {user.username} ({user.chat_id}) ignored.")
+            else:
+                log.warning("Function access_check claims User as second argument (because first is self)")
+        else:
+            log.error("Function access_check claims at least one argument (User)")
+
+    return wrapper
 
 class TelegramActions:
     """
@@ -106,7 +136,7 @@ class TelegramActions:
                     await self.distributor(for_process)
 
         except asyncio.CancelledError:
-            pass
+            log.info("TelegramActions: handler got asyncio.CancelledError")
 
 
     async def start_service(self):
@@ -143,67 +173,41 @@ class TelegramActions:
     # MODULATE_HERE
     # Ниже писать логику обработки сообщений
 
-    def access_check(func):
-        """
-        Эта функция предназначена только для декорирования.\n
-        <b>Первый аргумент всегда должен быть User'ом, которого мы проверяем.</b>\n
-        Все пользователи, у которых есть доступ к функции
-        будут пропущены дальше, для других же сработает заглушка.
-        Для игнорируемых пользователей сработает другая.
-        """
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            log.debug(f"access_check wrapper got *args:{str(args)}")
-            if len(args) > 1:
-                if type(args[1]) == User:
-                    user = args[1]
-                    if not user.ignore:
-                        if func.__name__ in user.available_functions:
-                            return func(*args, **kwargs)
-                        else:
-                            log.debug(f"User {user.username} ({user.chat_id}) tried to enter in disallowed function.")
-                    else:
-                        log.debug(f"Message from {user.username} ({user.chat_id}) ignored.")
-                else:
-                    log.warning("Function access_check claims User as second argument (because first is self)")
-            else:
-                log.error("Function access_check claims at least one argument (User)")
-
-        return wrapper
-
-
 
     @access_check
     def echo(self, message : Message):
         builder = InlineKeyboardBuilder()
         builder.button(text="Назад", callback_data=f"{Operations.take_to_function}|{self.main_menu.__name__}")
 
-        self.sendMessage(message.from_user.id, message.text, reply_makrup=builder.as_markup())
+        self.sendMessage(message.from_user.id, message.text, reply_markup=builder.as_markup())
 
     @access_check
     def main_menu(self, user : User):
         if user.rank == Ranks.owner:
             text = cleandoc("""
-            Главном меню, Господин
+            Главное меню, Господин
             """)
         else:
             text == cleandoc("""
-            Главном меню
+            Главное меню
             """)
 
         builder = InlineKeyboardBuilder()
 
         for func_name in user.available_functions:
-            builder.button(text=f"Перейти в {func_name}",
-                           callback_data=f"{Operations.take_to_function}|{func_name}")
+            if func_name == self.echo.__name__:
+                builder.button(text=f"Перейти в {func_name}",
+                            callback_data=f"{Operations.change_base_function}|{func_name}")
+            else:
+                builder.button(text=f"Перейти в {func_name}",
+                            callback_data=f"{Operations.take_to_function}|{func_name}")
 
         if len(user.available_functions) == 0:
             text += "\nВам пока не дали ни одной кнопки"
         
-        self.sendMessage(text=text, chat_id=user.chat_id, reply_makrup=builder.as_markup())
+        self.sendMessage(text=text, chat_id=user.chat_id, reply_markup=builder.as_markup())
         log.debug(f"Из main_menu отправлено сообщение: text = {text}; chat_id = {user.chat_id}; \
-                   reply_makrup = {str(deserialize_telegram_object_to_python(builder.as_markup()))}")
+                   reply_markup = {str(deserialize_telegram_object_to_python(builder.as_markup()))}")
 
 
 
@@ -243,6 +247,8 @@ class TelegramActions:
         func = self.functions.get(user.base_function)
         if func:
             func(user)
+        else:
+            log.debug("Message supressed")
             
 
 
@@ -256,6 +262,13 @@ class TelegramActions:
                 if func:
                     user = self.resolver.get_info(callback.from_user.chat_id)
                     func(user)
+            elif splitted[0] == Operations.change_base_function:
+                change_to_name = splitted[1]
+                func = self.functions.get(change_to_name)
+                if func:
+                    user = self.resolver.get_info(callback.from_user.chat_id)
+                    user.base_function = change_to_name
+                    self.resolver.update_user(user)
 
 
 
