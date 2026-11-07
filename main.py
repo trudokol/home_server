@@ -91,19 +91,8 @@ async def transfer():
         pass
 
 
-async def ask_exit(loop, background_tasks, signal):
+def ask_exit(loop, background_tasks, signal):
     log.info("Получен сигнал об остановке (%s), завершаю работу..." % signal)
-    
-    for task in background_tasks:
-        task.cancel()
-
-    await asyncio.gather(*background_tasks)
-
-    if tg_bot_logic:
-        await tg_bot_logic.stop_service()
-    if mqtt_client:
-        await mqtt_client.stop_service()
-
     loop.stop()
     
 
