@@ -175,14 +175,14 @@ class TelegramActions:
 
 
     @access_check
-    def echo(self, message : Message):
+    def echo(self, user : User, message : Message):
         builder = InlineKeyboardBuilder()
         builder.button(text="Назад", callback_data=f"{Operations.take_to_function}|{self.main_menu.__name__}")
 
         self.sendMessage(message.from_user.id, message.text, reply_markup=builder.as_markup())
 
     @access_check
-    def main_menu(self, user : User):
+    def main_menu(self, user : User, message : Message):
         if user.rank == Ranks.owner:
             text = cleandoc("""
             Главное меню, Господин
@@ -246,7 +246,7 @@ class TelegramActions:
 
         func = self.functions.get(user.base_function)
         if func:
-            func(user)
+            func(user, message)
         else:
             log.debug("Message supressed")
             
@@ -255,20 +255,34 @@ class TelegramActions:
     async def onCallbackQuery(self, callback : CallbackQuery):
         if callback.data:
             data = callback.data
+            log.debug(f"Got callback data: {data}")
+
             splitted = data.split("|")
-            if splitted[0] == Operations.take_to_function:
+            operation = int(splitted[0])
+            if operation == Operations.take_to_function:
                 take_to_name = splitted[1]
                 func = self.functions.get(take_to_name)
                 if func:
-                    user = self.resolver.get_info(callback.from_user.chat_id)
-                    func(user)
-            elif splitted[0] == Operations.change_base_function:
+                    user = self.resolver.get_info(callback.from_user.id)
+                    log.debug(f"{user.username} направлен в {take_to_name} по нажатию кнопки")
+                    func(user, None)
+                else:
+                    log.debug(f"Function {take_to_name} not found")
+            elif operation == Operations.change_base_function:
                 change_to_name = splitted[1]
                 func = self.functions.get(change_to_name)
                 if func:
-                    user = self.resolver.get_info(callback.from_user.chat_id)
+                    log.debug(f"callback.from_user.id = {callback.from_user.id}")
+                    user = self.resolver.get_info(callback.from_user.id)
                     user.base_function = change_to_name
                     self.resolver.update_user(user)
+                    log.debug(f"Для {user.username} изменилась base_function на {change_to_name}")
+                else:
+                    log.debug(f"Function {change_to_name} not found")
+            else:
+                log.debug(f"Operation {splitted[0]} not found")
+        else:
+            log.debug(f"Got empty callback.data")
 
 
 
